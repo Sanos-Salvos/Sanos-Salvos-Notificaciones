@@ -1,0 +1,6 @@
+com\sanos\notificaciones\controller\NotificationController.class
+com\sanos\notificaciones\service\NotificationService.class
+com\sanos\notificaciones\config\SecurityConfig.class
+com\sanos\notificaciones\repository\NotificationRepository.class
+com\sanos\notificaciones\model\Notification.class
+com\sanos\notificaciones\SanosSalvosNotificacionesApplication.class
