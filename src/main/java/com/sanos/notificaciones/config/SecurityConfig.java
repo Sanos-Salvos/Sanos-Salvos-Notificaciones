@@ -19,7 +19,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf().disable()
             .authorizeHttpRequests()
-            .requestMatchers("/notifications/send").authenticated()
+            .requestMatchers("/api/notificaciones/send").authenticated()
             .anyRequest().permitAll();
         return http.build();
     }
