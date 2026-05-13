@@ -2,6 +2,15 @@
 
 Servicio de notificaciones en Spring Boot con integración Kafka y JWT.
 
+## Estructura del proyecto
+
+- `Dockerfile`
+- `pom.xml`
+- `README.md`
+- `src/main/java/com/sanos/notificaciones/`
+- `src/main/resources/application.properties`
+- `target/` (artefactos compilados)
+
 ## Puerto
 
 - `8086`
