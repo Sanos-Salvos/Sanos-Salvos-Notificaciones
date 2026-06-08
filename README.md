@@ -1,36 +1,31 @@
-﻿# 🏥 Sanos-Salvos-Notificaciones
+﻿# Sanos-Salvos-Notificaciones
 
 Sistema de alertas y notificaciones
 
 ## Puerto
-\\\
+
 8086
-\\\
 
 ## Base de datos
-\\\
+
 notificaciones_db
-\\\
 
-## Endpoints
-\\\
-/api/notificaciones/send
-\\\
+## Endpoints disponibles
 
-## Ejecución
+POST /api/notificaciones/send
 
-### Docker
-\\\ash
+## Ejecucion con Docker
+
 docker-compose up --build
-\\\
 
-### Manual
-\\\ash
+## Ejecucion manual
+
 mvn spring-boot:run
-\\\
 
-## Stack
+## Tecnologias
+
 - Java 21
 - Spring Boot 3.2
+- Spring Security + JWT
 - PostgreSQL
 - Docker
