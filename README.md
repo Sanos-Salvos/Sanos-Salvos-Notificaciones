@@ -1,48 +1,31 @@
-# Sanos-Salvos-Notificaciones
+﻿# Sanos-Salvos-Notificaciones
 
-Servicio de notificaciones en Spring Boot con integración Kafka y JWT.
-
-## Estructura del proyecto
-
-- `Dockerfile`
-- `pom.xml`
-- `README.md`
-- `src/main/java/com/sanos/notificaciones/`
-- `src/main/resources/application.properties`
-- `target/` (artefactos compilados)
+Sistema de alertas y notificaciones
 
 ## Puerto
 
-- `8086`
+8086
 
-## Endpoints
+## Base de datos
 
-- `POST /api/notificaciones/send?message={message}&recipient={recipient}`
+notificaciones_db
 
-## Configuración principal
+## Endpoints disponibles
 
-- `server.port=8086`
-- `spring.datasource.url=jdbc:postgresql://localhost:5432/notificaciones_db`
-- `spring.datasource.username=postgres`
-- `spring.datasource.password=password`
-- `spring.kafka.bootstrap-servers=localhost:9092`
-- `spring.kafka.consumer.group-id=notificaciones-group`
-- `jwt.secret=mySecretKey`
-- `jwt.expiration=86400000`
+POST /api/notificaciones/send
 
-## Requisitos
+## Ejecucion con Docker
 
-- Java 17
-- Maven
-- PostgreSQL
-- Kafka en `localhost:9092`
+docker-compose up --build
 
-## Ejecución
+## Ejecucion manual
 
-```bash
-cd Sanos-Salvos-Notificaciones
-mvn clean package
 mvn spring-boot:run
-```
 
-O con Docker: `docker-compose up notificaciones-service` desde la raíz del repositorio.
+## Tecnologias
+
+- Java 21
+- Spring Boot 3.2
+- Spring Security + JWT
+- PostgreSQL
+- Docker
