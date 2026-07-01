@@ -1,95 +1,91 @@
 package com.sanos.notificaciones.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.sanos.notificaciones.dto.NotificationDTO;
 import com.sanos.notificaciones.factory.INotificationFactory;
+import com.sanos.notificaciones.factory.NotificationFactoryImpl;
 import com.sanos.notificaciones.model.Notification;
 import com.sanos.notificaciones.service.NotificationService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(NotificationController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@ExtendWith(MockitoExtension.class)
 class NotificationControllerTest {
 
-    @Autowired
     private MockMvc mockMvc;
-
-    @MockBean
-    private NotificationService notificationService;
-
-    @MockBean
-    private INotificationFactory notificationFactory;
-
-    @Autowired
     private ObjectMapper objectMapper;
 
-    private Notification createSampleNotification(String message, String recipient) {
-        Notification n = new Notification();
-        n.setId(1L);
-        n.setMessage(message);
-        n.setRecipient(recipient);
-        n.setTimestamp(LocalDateTime.now());
-        return n;
+    @Mock
+    private NotificationService notificationService;
+
+    @Mock
+    private INotificationFactory notificationFactory;
+
+    @InjectMocks
+    private NotificationController notificationController;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders.standaloneSetup(notificationController).build();
+        objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
     }
 
     @Test
-    void sendNotification_returns200() throws Exception {
-        NotificationDTO dto = new NotificationDTO();
-        dto.setMessage("Hola");
-        dto.setRecipient("nicolas");
+    void send_returnsSuccess() throws Exception {
+        NotificationDTO inputDTO = new NotificationDTO("Hola", "test@mail.com", LocalDateTime.now());
+        Notification entity = new Notification(1L, "Hola", "test@mail.com", LocalDateTime.now());
+        Notification saved = new Notification(1L, "Hola", "test@mail.com", LocalDateTime.now());
+        NotificationDTO responseDTO = new NotificationDTO("Hola", "test@mail.com", saved.getTimestamp());
 
-        Notification notification = createSampleNotification("Hola", "nicolas");
-
-        when(notificationFactory.toEntity(any(NotificationDTO.class))).thenReturn(notification);
-        when(notificationService.sendNotification("Hola", "nicolas")).thenReturn(notification);
-        when(notificationFactory.toDTO(any(Notification.class))).thenReturn(dto);
+        when(notificationFactory.toEntity(any(NotificationDTO.class))).thenReturn(entity);
+        when(notificationService.sendNotification(eq("Hola"), eq("test@mail.com"))).thenReturn(saved);
+        when(notificationFactory.toDTO(any(Notification.class))).thenReturn(responseDTO);
 
         mockMvc.perform(post("/api/notificaciones/send")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(dto)))
+                        .content(objectMapper.writeValueAsString(inputDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mensaje").value("Notificación procesada exitosamente"));
-
-        verify(notificationService).sendNotification("Hola", "nicolas");
+                .andExpect(jsonPath("$.mensaje").value("Notificación procesada exitosamente"))
+                .andExpect(jsonPath("$.notificacion.message").value("Hola"))
+                .andExpect(jsonPath("$.notificacion.recipient").value("test@mail.com"));
     }
 
     @Test
-    void sendNotification_emptyBody_returnsBadRequest() throws Exception {
+    void send_serviceThrows_returns500() throws Exception {
+        NotificationDTO inputDTO = new NotificationDTO("msg", "r@mail.com", LocalDateTime.now());
+
+        when(notificationFactory.toEntity(any(NotificationDTO.class)))
+                .thenThrow(new RuntimeException("Service error"));
+
         mockMvc.perform(post("/api/notificaciones/send")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(""))
+                        .content(objectMapper.writeValueAsString(inputDTO)))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("Service error"));
+    }
+
+    @Test
+    void send_invalidJson_returns400() throws Exception {
+        mockMvc.perform(post("/api/notificaciones/send")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{invalid json}"))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void sendNotification_serviceException_returns500() throws Exception {
-        NotificationDTO dto = new NotificationDTO();
-        dto.setMessage("msg");
-        dto.setRecipient("rcpt");
-
-        Notification notification = createSampleNotification("msg", "rcpt");
-
-        when(notificationFactory.toEntity(any(NotificationDTO.class))).thenReturn(notification);
-        doThrow(new RuntimeException("kafka error"))
-                .when(notificationService).sendNotification(anyString(), anyString());
-
-        mockMvc.perform(post("/api/notificaciones/send")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(dto)))
-                .andExpect(status().isInternalServerError());
     }
 }

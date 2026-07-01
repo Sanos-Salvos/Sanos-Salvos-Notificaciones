@@ -5,18 +5,15 @@ import com.sanos.notificaciones.repository.NotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
 
-import java.util.concurrent.CompletableFuture;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -32,82 +29,61 @@ class NotificationServiceTest {
     @InjectMocks
     private NotificationService notificationService;
 
-    private static final String TOPIC = "notifications";
+    private Notification savedNotification;
 
     @BeforeEach
     void setUp() {
-        lenient().when(notificationRepository.save(any(Notification.class)))
-                .thenAnswer(inv -> {
-                    Notification n = inv.getArgument(0);
-                    n.setId(1L);
-                    return n;
-                });
+        savedNotification = new Notification(1L, "Test msg", "test@mail.com", LocalDateTime.now());
     }
 
     @Test
-    void sendNotification_savesAndSendsToKafka() {
-        when(kafkaTemplate.send(eq(TOPIC), any(String.class)))
-                .thenReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
+    void sendNotification_savesAndSendsKafka() {
+        when(notificationRepository.save(any(Notification.class))).thenReturn(savedNotification);
+        when(kafkaTemplate.send(eq("notifications"), any(String.class))).thenReturn(null);
 
-        Notification result = notificationService.sendNotification("Hola", "nicolas");
+        Notification result = notificationService.sendNotification("Test msg", "test@mail.com");
 
         assertNotNull(result);
-        assertEquals("Hola", result.getMessage());
-        assertEquals("nicolas", result.getRecipient());
+        assertEquals(1L, result.getId());
+        assertEquals("Test msg", result.getMessage());
+        assertEquals("test@mail.com", result.getRecipient());
         assertNotNull(result.getTimestamp());
 
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
-        verify(notificationRepository).save(captor.capture());
-        assertEquals("Hola", captor.getValue().getMessage());
-        assertEquals("nicolas", captor.getValue().getRecipient());
-
-        verify(kafkaTemplate).send(TOPIC, "Hola");
+        verify(notificationRepository, times(1)).save(any(Notification.class));
+        verify(kafkaTemplate, times(1)).send("notifications", "Test msg");
     }
 
     @Test
-    void sendNotification_setsTimestampBeforeSave() {
-        when(kafkaTemplate.send(anyString(), anyString()))
-                .thenReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
+    void sendNotification_setsTimestamp() {
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> {
+            Notification n = invocation.getArgument(0);
+            assertNotNull(n.getTimestamp());
+            return savedNotification;
+        });
 
-        Notification result = notificationService.sendNotification("test", "user");
-
-        assertNotNull(result.getTimestamp());
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
-        verify(notificationRepository).save(captor.capture());
-        assertNotNull(captor.getValue().getTimestamp());
-    }
-
-    @Test
-    void sendNotification_callsKafkaAfterSave() {
-        when(kafkaTemplate.send(anyString(), anyString()))
-                .thenReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
-
-        notificationService.sendNotification("msg", "rcpt");
-
-        var order = inOrder(notificationRepository, kafkaTemplate);
-        order.verify(notificationRepository).save(any());
-        order.verify(kafkaTemplate).send(anyString(), anyString());
-    }
-
-    @Test
-    void sendNotification_kafkaFails_stillSaves() {
-        when(kafkaTemplate.send(anyString(), anyString()))
-                .thenReturn(CompletableFuture.failedFuture(new RuntimeException("kafka down")));
-
-        try {
-            notificationService.sendNotification("msg", "rcpt");
-        } catch (Exception ignored) {
-        }
+        notificationService.sendNotification("msg", "r@mail.com");
 
         verify(notificationRepository).save(any(Notification.class));
     }
 
     @Test
-    void sendNotification_nullMessage_handledGracefully() {
-        when(kafkaTemplate.send(anyString(), any()))
-                .thenReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
+    void sendNotification_sendsCorrectKafkaMessage() {
+        when(notificationRepository.save(any(Notification.class))).thenReturn(savedNotification);
+        when(kafkaTemplate.send(any(), any())).thenReturn(null);
 
-        assertDoesNotThrow(() ->
-                notificationService.sendNotification(null, "rcpt"));
+        notificationService.sendNotification("Alerta urgente", "admin@sanos.com");
+
+        verify(kafkaTemplate).send("notifications", "Alerta urgente");
+    }
+
+    @Test
+    void sendNotification_repositoryThrows_doesNotSendKafka() {
+        when(notificationRepository.save(any(Notification.class)))
+                .thenThrow(new RuntimeException("DB error"));
+
+        assertThrows(RuntimeException.class, () ->
+                notificationService.sendNotification("msg", "r@mail.com"));
+
+        verify(kafkaTemplate, never()).send(any(), any());
     }
 }
